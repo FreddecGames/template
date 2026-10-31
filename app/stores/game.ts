@@ -22,6 +22,9 @@ export const useGameStore = defineStore('game', {
 		prods: [] as any[],
 		manuals: [] as any[],
 		machines: [] as any[],
+		
+		itemMap: {} as Record<string, any>,
+		prodMap: {} as Record<string, any>,
 	}),
 
 	getters: {
@@ -69,6 +72,11 @@ export const useGameStore = defineStore('game', {
 					count: i.count
 				})),
 
+				machines: this.machines.map(m => ({
+					id: m.id,
+					count: m.count
+				})),
+
 				prods: this.prods.map(p => ({
 					id: p.id, 
 					assignedCount: p.assignedCount || 0,
@@ -76,6 +84,13 @@ export const useGameStore = defineStore('game', {
 					isProcessing: p.isProcessing || false,
 					runMachineCount: p.runMachineCount || 0,
 					inputs: p.inputs.map((i: any) => ({ id: i.id, bufferCount: i.bufferCount || 0 }))
+				})),
+
+				manuals: this.manuals.map(m => ({
+					id: m.id, 
+					progressSeconds: m.progressSeconds || 0,
+					isProcessing: m.isProcessing || false,
+					queueCount: m.queueCount || 0
 				})),
 			}
 
@@ -154,6 +169,8 @@ export const useGameStore = defineStore('game', {
 				fetch(`/scenarios/${this.currentScenarioId}/data.json`).then(response => response.json())
 			])
 
+			// Items
+
 			this.items = []
 			if (scenarioData && scenarioData.items) {
 				scenarioData.items.forEach((itemData: any) => {
@@ -169,6 +186,8 @@ export const useGameStore = defineStore('game', {
 				})
 			}
 
+			// Machines
+
 			this.machines = []
 			if (scenarioData && scenarioData.machines) {
 				scenarioData.machines.forEach((machineData: any) => {
@@ -181,6 +200,8 @@ export const useGameStore = defineStore('game', {
 					})
 				})
 			}
+
+			// Recipes
 
 			this.prods = []
 			this.manuals = []
@@ -291,6 +312,13 @@ export const useGameStore = defineStore('game', {
 					})
 				}
 
+				if (decryptedLocalData.machines) {
+					decryptedLocalData.machines.forEach((savedMachine: any) => {
+						const machine = this.machines.find(m => m.id === savedMachine.id)
+						if (machine) machine.count = savedMachine.count ?? 0
+					})
+				}
+
 				if (decryptedLocalData.prods) {
 					decryptedLocalData.prods.forEach((savedProd: any) => {
 						const prod = this.prods.find(p => p.id === savedProd.id)
@@ -310,7 +338,29 @@ export const useGameStore = defineStore('game', {
 						}
 					})
 				}
+
+				if (decryptedLocalData.manuals) {
+					decryptedLocalData.manuals.forEach((savedManual: any) => {
+						const manual = this.manuals.find(m => m.id === savedManual.id)
+						if (manual) {
+
+							manual.progressSeconds = savedManual.progressSeconds ?? 0
+							manual.isProcessing = savedManual.isProcessing || false
+							manual.queueCount = savedManual.queueCount ?? 0
+						}
+					})
+				}
 			}
+
+			// Util maps
+
+			this.itemMap = {}
+			this.items.forEach(item => { this.itemMap[item.id] = item })
+
+			this.prodMap = {}
+			this.prods.forEach(prod => { this.prodMap[prod.id] = prod })
+
+			// Offline gains
 
 			if (this.lastSaveDate > 0) this.processOfflineProgress()
 		},
@@ -323,29 +373,20 @@ export const useGameStore = defineStore('game', {
 
 			if (offlineSeconds <= 0) return
 
-			const itemMap: Record<string, any> = {}
-			this.items.forEach(item => { itemMap[item.id] = item })
-
-			const prodMap: Record<string, any> = {}
-			this.prods.forEach(prod => { prodMap[prod.id] = prod })
-
 			const tickSeconds = 2
 			while (offlineSeconds > 0) {
 
 				const currentTick = Math.min(offlineSeconds, tickSeconds)
-				this.processGameTick(currentTick, itemMap, prodMap)
+				this.processGameTick(currentTick)
 				offlineSeconds -= currentTick
 			}
 		},
 
 		// Game tick
 
-		processGameTick(deltaSeconds: number, precomputedItemMap?: Record<string, any>, precomputedProdMap?: Record<string, any>) {
+		processGameTick(deltaSeconds: number) {
 
 			if (this.items.length === 0) return
-
-			const itemMap = precomputedItemMap || this.items.reduce((acc, item) => ({ ...acc, [item.id]: item }), {})
-			const prodMap = precomputedProdMap || this.prods.reduce((acc, prod) => ({ ...acc, [prod.id]: prod }), {})
 
 			// Manual crafting
 
@@ -355,7 +396,7 @@ export const useGameStore = defineStore('game', {
 				if (manual.progressSeconds >= (manual.durationSeconds * manual.queueCount)) {
 
 					manual.outputs.forEach((output: any) => {
-						const outputItem = itemMap[output.id]
+						const outputItem = this.itemMap[output.id]
 						if (outputItem) {
 							outputItem.count += output.rate * manual.queueCount
 							if (outputItem.count > outputItem.max) outputItem.count = outputItem.max
@@ -376,10 +417,10 @@ export const useGameStore = defineStore('game', {
 
 				item.links.forEach((link: any) => {
 
-					const targetProd = prodMap[link.targetProdId]
+					const targetProd = this.prodMap[link.targetProdId]
 					if (!targetProd) return
 
-					const targetProdInput = prodMap[link.targetInputId]
+					const targetProdInput = this.prodMap[link.targetInputId]
 					if (!targetProdInput) return
 
 					const targetProdInputSpace = targetProdInput.bufferMax - targetProdInput.bufferCount
@@ -424,7 +465,7 @@ export const useGameStore = defineStore('game', {
 
 						if (output.rate <= 0) return
 
-						const outputItem = itemMap[output.id]
+						const outputItem = this.itemMap[output.id]
 						if (!outputItem) {
 							runMachineCount = 0
 							return
@@ -459,7 +500,7 @@ export const useGameStore = defineStore('game', {
 						let canDeliver = true
 
 						prod.outputs.forEach((output: any) => {
-							const outputItem = itemMap[output.id]
+							const outputItem = this.itemMap[output.id]
 							if (!outputItem || (outputItem.max - outputItem.count) < (output.rate * prod.runMachineCount))
 								canDeliver = false
 						})
@@ -467,7 +508,7 @@ export const useGameStore = defineStore('game', {
 						if (canDeliver) {
 
 							prod.outputs.forEach((output: any) => {
-								const outputItem = itemMap[output.id]
+								const outputItem = this.itemMap[output.id]
 								if (outputItem) {
 									outputItem.count += output.rate * prod.runMachineCount
 									if (outputItem.count > outputItem.max) outputItem.count = outputItem.max
