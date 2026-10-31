@@ -290,22 +290,33 @@ export const useGameStore = defineStore('game', {
 			let offlineSeconds = Math.max(0, (now - this.lastSaveDate) / 1000)
 			offlineSeconds = Math.min(offlineSeconds, 43200)
 
+			if (offlineSeconds <= 0) return
+
+			const itemMap: Record<string, any> = {}
+			this.items.forEach(item => { itemMap[item.id] = item })
+
+			const prodMap: Record<string, any> = {}
+			this.prods.forEach(prod => { prodMap[prod.id] = prod })
+
 			const tickSeconds = 2
 			while (offlineSeconds > 0) {
 
 				const currentTick = Math.min(offlineSeconds, tickSeconds)
-				this.processGameTick(currentTick)
+				this.processGameTick(currentTick, itemMap, prodMap)
 				offlineSeconds -= currentTick
 			}
 		},
 
 		// Game tick
 
-		processGameTick(deltaSeconds: number) {
+		processGameTick(deltaSeconds: number, precomputedItemMap?: Record<string, any>, precomputedProdMap?: Record<string, any>) {
 
 			// Logistic links
 
 			if (this.items.length === 0) return
+			
+			const itemMap = precomputedItemMap || this.items.reduce((acc, item) => ({ ...acc, [item.id]: item }), {})
+			const prodMap = precomputedProdMap || this.prods.reduce((acc, prod) => ({ ...acc, [prod.id]: prod }), {})
 
 			this.items.forEach(item => {
 
