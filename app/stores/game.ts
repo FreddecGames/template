@@ -154,8 +154,6 @@ export const useGameStore = defineStore('game', {
 				fetch(`/scenarios/${this.currentScenarioId}/data.json`).then(response => response.json())
 			])
 
-			this.machines = scenarioData.machines || []
-
 			this.items = []
 			if (scenarioData && scenarioData.items) {
 				scenarioData.items.forEach((itemData: any) => {
@@ -171,7 +169,22 @@ export const useGameStore = defineStore('game', {
 				})
 			}
 
+			this.machines = []
+			if (scenarioData && scenarioData.machines) {
+				scenarioData.machines.forEach((machineData: any) => {
+					this.machines.push({
+						id: machineData.id,
+						img: `/scenarios/${this.currentScenarioId}/img/${machineData.id}.png`,
+						name: 'machine_' + machineData.id,
+						group: machineData.group,
+						count: machineData.initialCount || 0,
+					})
+				})
+			}
+
 			this.prods = []
+			this.manuals = []
+
 			if (scenarioData && scenarioData.recipes) {
 				scenarioData.recipes.forEach((recipeData: any) => {
 					
@@ -201,49 +214,66 @@ export const useGameStore = defineStore('game', {
 
 					compatibleMachineIds.forEach((machineId: string) => {
 
-						let machineSpeed = 1
 						if (machineId !== 'manual') {
+
+							const uniqueManualId = `${recipeData.id}_manual`
+
+							this.manuals.push({
+								id: uniqueManualId,
+								recipeId: recipeData.id,
+								group: recipeData.group,
+								durationSeconds: recipeData.seconds,
+								progressSeconds: 0,
+								isProcessing: false,
+								queueCount: 0,
+								outputs: recipeData.outputs,
+								inputs: recipeData.inputs,
+							})
+						}
+						else {
+
+							let machineSpeed = 1
 							const machineConfig = this.machines.find(m => m.id === machineId)
 							if (machineConfig && machineConfig.speed !== undefined)
 								machineSpeed = machineConfig.speed
+
+							const adjustedDuration = (recipeData.seconds || 1) / machineSpeed
+
+							const lineInputs = recipeInputs.map(input => ({
+								...input,
+								bufferCount: 0
+							}))
+
+							const uniqueLineId = `${recipeData.id}_${machineId}`
+
+							lineInputs.forEach((input: any) => {
+								const inputItem = this.items.find(i => i.id === input.id)
+								if (inputItem) {
+									inputItem.links.push({
+										targetProdId: uniqueLineId,
+										targetInputId: input.id,
+										rate: 0,
+									})
+								}
+							})
+
+							this.prods.push({
+
+								id: uniqueLineId,                  
+								recipeId: recipeData.id,            
+								machineId: machineId,              
+								group: recipeData.group,            
+								assignedCount: 0,
+								
+								durationSeconds: adjustedDuration, 
+								progressSeconds: 0,
+								isProcessing: false,
+								runMachineCount: 0,
+
+								outputs: recipeOutputs,
+								inputs: lineInputs
+							})
 						}
-
-						const adjustedDuration = (recipeData.seconds || 1) / machineSpeed
-
-						const lineInputs = recipeInputs.map(input => ({
-							...input,
-							bufferCount: 0
-						}))
-
-						const uniqueLineId = `${recipeData.id}_${machineId}`
-
-						lineInputs.forEach((input: any) => {
-							const inputItem = this.items.find(i => i.id === input.id)
-							if (inputItem) {
-								inputItem.links.push({
-									targetProdId: uniqueLineId,
-									targetInputId: input.id,
-									rate: 0,
-								})
-							}
-						})
-
-						this.prods.push({
-
-							id: uniqueLineId,                  
-							recipeId: recipeData.id,            
-							machineId: machineId,              
-							group: recipeData.group,            
-							assignedCount: 0,
-							
-							durationSeconds: adjustedDuration, 
-							progressSeconds: 0,
-							isProcessing: false,
-							runMachineCount: 0,
-
-							outputs: recipeOutputs,
-							inputs: lineInputs
-						})
 					})
 				})
 			}
