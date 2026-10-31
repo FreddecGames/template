@@ -322,7 +322,19 @@ export const useGameStore = defineStore('game', {
 			this.manuals.filter(m => m.isProcessing).forEach(manual => {
 
 				manual.progressSeconds += deltaSeconds
-				if (manual.progressSeconds >= manual.durationSeconds) {
+				if (manual.progressSeconds >= (manual.durationSeconds * manual.queueCount)) {
+
+					manual.outputs.forEach((output: any) => {
+						const outputItem = itemMap[output.id]
+						if (outputItem) {
+							outputItem.count += output.rate * manual.queueCount
+							if (outputItem.count > outputItem.max) outputItem.count = outputItem.max
+						}
+					})
+
+					manual.isProcessing = false
+					manual.progressSeconds = 0
+					manual.queueCount = 0
 				}
 			})
 
