@@ -20,6 +20,7 @@ export const useGameStore = defineStore('game', {
 
 		items: [] as any[],
 		prods: [] as any[],
+		manuals: [] as any[],
 		machines: [] as any[],
 	}),
 
@@ -311,12 +312,21 @@ export const useGameStore = defineStore('game', {
 
 		processGameTick(deltaSeconds: number, precomputedItemMap?: Record<string, any>, precomputedProdMap?: Record<string, any>) {
 
-			// Logistic links
-
 			if (this.items.length === 0) return
-			
+
 			const itemMap = precomputedItemMap || this.items.reduce((acc, item) => ({ ...acc, [item.id]: item }), {})
 			const prodMap = precomputedProdMap || this.prods.reduce((acc, prod) => ({ ...acc, [prod.id]: prod }), {})
+
+			// Manual crafting
+
+			this.manuals.filter(m => m.isProcessing).forEach(manual => {
+
+				manual.progressSeconds += deltaSeconds
+				if (manual.progressSeconds >= manual.durationSeconds) {
+				}
+			})
+
+			// Logistic links
 
 			this.items.forEach(item => {
 
@@ -324,10 +334,10 @@ export const useGameStore = defineStore('game', {
 
 				item.links.forEach((link: any) => {
 
-					const targetProd = this.prods.find(p => p.id === link.targetProdId)
+					const targetProd = prodMap[link.targetProdId]
 					if (!targetProd) return
 
-					const targetProdInput = targetProd.inputs.find((i: any) => i.id === link.targetInputId)
+					const targetProdInput = prodMap[link.targetInputId]
 					if (!targetProdInput) return
 
 					const targetProdInputSpace = targetProdInput.bufferMax - targetProdInput.bufferCount
@@ -372,7 +382,7 @@ export const useGameStore = defineStore('game', {
 
 						if (output.rate <= 0) return
 
-						const outputItem = this.items.find(i => i.id === output.id)
+						const outputItem = itemMap[output.id]
 						if (!outputItem) {
 							runMachineCount = 0
 							return
@@ -402,13 +412,12 @@ export const useGameStore = defineStore('game', {
 				if (prod.isProcessing) {
 
 					prod.progressSeconds += deltaSeconds
-
 					if (prod.progressSeconds >= prod.durationSeconds) {
 
 						let canDeliver = true
 
 						prod.outputs.forEach((output: any) => {
-							const outputItem = this.items.find(i => i.id === output.id)
+							const outputItem = itemMap[output.id]
 							if (!outputItem || (outputItem.max - outputItem.count) < (output.rate * prod.runMachineCount))
 								canDeliver = false
 						})
@@ -416,7 +425,7 @@ export const useGameStore = defineStore('game', {
 						if (canDeliver) {
 
 							prod.outputs.forEach((output: any) => {
-								const outputItem = this.items.find(i => i.id === output.id)
+								const outputItem = itemMap[output.id]
 								if (outputItem) {
 									outputItem.count += output.rate * prod.runMachineCount
 									if (outputItem.count > outputItem.max) outputItem.count = outputItem.max
