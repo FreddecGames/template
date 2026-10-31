@@ -6,7 +6,7 @@ export default defineNuxtConfig({
 
     devtools: { enabled: false },
 
-    modules: [ '@pinia/nuxt', '@nuxt/ui' ],
+    modules: [ '@pinia/nuxt', '@nuxt/ui' , '@nuxtjs/i18n'],
 
     css: ['~/assets/css/main.css'],
 
@@ -16,5 +16,13 @@ export default defineNuxtConfig({
                 { rel: 'icon', type: 'image/png', href: '/favicon.png' }
             ]
         }
-    }
+    },
+
+	i18n: {
+		locales: [
+			{ code: 'en', file: 'en.json' },
+			{ code: 'fr', file: 'fr.json' }
+		],
+		defaultLocale: 'en'
+	}
 })

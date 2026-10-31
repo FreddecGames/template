@@ -1,0 +1,19 @@
+{
+	"items":[
+
+		{ "id":"iron", "group":"mined", "stack":100 },
+		{ "id":"iron_ingot", "group":"smelted", "stack":100 }
+	],
+
+	"recipes":[
+
+		{ "id":"iron", "group":"mining", "machines":[ "manual", "miner_0" ], "seconds":1, "outputs":{ "iron":1 } },
+		{ "id":"iron_ingot", "group":"smelting", "machines":[ "manual", "smelter" ], "seconds":2, "outputs":{ "iron_ingot":1 }, "inputs":{ "iron":1 } }
+	],
+
+	"machines":[
+
+		{ "id":"miner_0", "group":"miner", "speed":0.5 },
+		{ "id":"smelter", "group":"smelter", "speed":1 }
+	]
+}

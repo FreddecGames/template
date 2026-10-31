@@ -1,0 +1,12 @@
+{
+	"gameName": "FG Factory",
+
+	"loading":{
+		"error": "Cannot load local data",
+		"error_button": "Wipe local data"
+	},
+
+	"tabs":{
+		"items": "Items"
+	}
+}
